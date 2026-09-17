@@ -1,0 +1,179 @@
+// This is your Prisma schema file
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AppointmentStatus {
+  confirmed
+  completed
+  cancelled
+  no_show
+}
+
+enum ReminderType {
+  confirmation
+  reminder_24h
+  reminder_1h
+  cancellation
+  reschedule
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("admin")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Provider {
+  id              String   @id @default(cuid())
+  name            String
+  title           String
+  photoUrl        String?
+  bio             String?
+  qualifications  String[]
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  services        ServiceProvider[]
+  schedules       AvailabilitySchedule[]
+  overrides       AvailabilityOverride[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+}
+
+model Service {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  durationMin       Int
+  bufferBeforeMin   Int      @default(0)
+  bufferAfterMin    Int      @default(0)
+  price             Decimal  @db.Decimal(10, 2)
+  description       String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  providers         ServiceProvider[]
+  appointments      Appointment[]
+  waitlistEntries   WaitlistEntry[]
+}
+
+model ServiceProvider {
+  serviceId   String
+  providerId  String
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@id([serviceId, providerId])
+}
+
+model AvailabilitySchedule {
+  id        String   @id @default(cuid())
+  providerId String
+  provider  Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  dayOfWeek Int      // 0=Sunday, 1=Monday, etc.
+  startTime String   // HH:mm format
+  endTime   String   // HH:mm format
+
+  @@unique([providerId, dayOfWeek, startTime, endTime])
+}
+
+model AvailabilityOverride {
+  id        String   @id @default(cuid())
+  providerId String
+  provider  Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  startTime String?  // HH:mm format, null = full day blocked
+  endTime   String?  // HH:mm format
+  isBlocked Boolean  @default(true)
+  revision  Int      @default(1)
+
+  @@unique([providerId, date, startTime, endTime])
+}
+
+model Appointment {
+  id               String         @id @default(cuid())
+  providerId       String
+  provider         Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId        String
+  service          Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  patientName      String
+  patientEmail     String
+  patientPhone     String
+  startsAt         DateTime       @db.Timestamptz(6)
+  endsAt           DateTime       @db.Timestamptz(6)
+  status           AppointmentStatus @default(confirmed)
+  notes            String?
+  lateCancelFee    Boolean        @default(false)
+  noShowFee        Boolean        @default(false)
+  idempotencyKey   String?        @unique
+  cancelToken      String?        @unique
+  rescheduleToken  String?        @unique
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  reminders        ReminderLog[]
+
+  @@index([providerId, startsAt])
+  @@index([patientEmail])
+  @@index([status])
+}
+
+model WaitlistEntry {
+  id            String   @id @default(cuid())
+  providerId    String
+  provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId     String
+  service       Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  patientName   String
+  patientEmail  String
+  patientPhone  String
+  requestedDate DateTime @db.Date
+  position      Int
+  notifiedAt    DateTime?
+  claimedAt     DateTime?
+  claimToken    String?  @unique
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([providerId, requestedDate])
+}
+
+model ReminderLog {
+  id                String      @id @default(cuid())
+  appointmentId     String
+  appointment       Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  type              ReminderType
+  sentAt            DateTime    @default(now())
+  providerMessageId String?
+
+  @@unique([appointmentId, type])
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  name        String
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([date])
+}
+
+model SmsSettings {
+  id        String   @id @default("singleton")
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
