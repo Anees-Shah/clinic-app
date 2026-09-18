@@ -168,11 +168,5 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Promote Neon Branch
-        if: success()
-        uses: neondatabase/promote-branch-action@v1
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: main
-          api_key: ${{ secrets.NEON_API_KEY }}
+          # NOTE: no Neon "promote" step — production is a dedicated `production`
+          # branch (migrated above); there is no promote-branch action and none needed.
