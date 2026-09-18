@@ -201,9 +201,20 @@ jobs:
 
       - name: Deploy to Vercel Production
         run: |
-          # Preflight: fail fast naming WHICH secret is malformed/missing (shapes only, values never printed),
-          # so a swapped ORG<->PROJECT paste or typo is caught here instead of a cryptic CLI error.
-          # All tests sit in `||`/case positions: safe under `bash -e -o pipefail`.
+          # Trim whitespace/CRLF from pasted secrets (PowerShell copy-paste often adds
+          # trailing spaces/newlines) — pure shell parameter expansion, values never printed.
+          trim_ws() {
+            local _v="$1"
+            _v="${_v#"${_v%%[![:space:]]*}"}"
+            _v="${_v%"${_v##*[![:space:]]}"}"
+            _v="${_v//$'\r'/}"
+            printf '%s' "$_v"
+          }
+          VERCEL_TOKEN="$(trim_ws "${VERCEL_TOKEN:-}")"
+          VERCEL_ORG_ID="$(trim_ws "${VERCEL_ORG_ID:-}")"
+          VERCEL_PROJECT_ID="$(trim_ws "${VERCEL_PROJECT_ID:-}")"
+          # Preflight 1: shape check (fail fast on swap/typo, values never printed).
+          # All tests sit in `||`/case/`if` positions: safe under `bash -e -o pipefail`.
           bad=""
           [ -n "$VERCEL_TOKEN" ] || bad="$bad VERCEL_TOKEN(missing/empty)"
           case "${VERCEL_ORG_ID:-}" in team_*) ;; *) bad="$bad VERCEL_ORG_ID(must start with team_ - check swap/typo)";; esac
@@ -212,7 +223,56 @@ jobs:
             echo "Vercel secret shape check failed:$bad - fix under GitHub repo Settings > Secrets and variables > Actions (prefixes only: org=team_..., project=prj_...), then Re-run failed jobs."
             exit 1
           fi
-          # FIX: dropped --scope (was --scope="$VERCEL_ORG_ID"): with VERCEL_ORG_ID/VERCEL_PROJECT_ID env set the CLI already knows org+project (documented CI pattern), and --scope's ID-vs-slug strictness was the whole "scope does not exist" bug.
+          # Preflight 2: REST diagnosis via Vercel API (curl, already on runner) BEFORE the CLI,
+          # so the log names the exact broken piece instead of 'Could not retrieve Project Settings'.
+          # Values never printed. Every fallible command sits in an `if` condition (POSIX `set -e` exemption).
+          TMP_RESP="$(mktemp)"
+          if ! HTTP_CODE="$(curl -s -o "$TMP_RESP" -w "%{http_code}" --max-time 20 -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID")"; then
+            echo "Could not reach Vercel API to verify secrets (network/curl failed) - check runner network, then Re-run failed jobs; if it persists, re-enter VERCEL_TOKEN under GitHub repo Settings > Secrets and variables > Actions."
+            rm -f "$TMP_RESP"
+            exit 1
+          fi
+          case "$HTTP_CODE" in
+            200)
+              echo "Vercel API preflight: token + project ID OK (200)."
+              ;;
+            401|403)
+              echo "Vercel API preflight returned $HTTP_CODE - VERCEL_TOKEN is invalid or has no access to this team/project - fix under GitHub repo Settings > Secrets and variables > Actions: recreate VERCEL_TOKEN with Full Account scope and re-enter it carefully, then Re-run failed jobs."
+              rm -f "$TMP_RESP"
+              exit 1
+              ;;
+            404)
+              echo "Vercel API preflight returned 404 - VERCEL_PROJECT_ID is wrong or the token cannot see it - fix under GitHub repo Settings > Secrets and variables > Actions: re-copy VERCEL_PROJECT_ID carefully (must start with prj_...), then Re-run failed jobs."
+              rm -f "$TMP_RESP"
+              exit 1
+              ;;
+            *)
+              echo "Vercel API preflight returned unexpected HTTP $HTTP_CODE - check VERCEL_TOKEN / VERCEL_PROJECT_ID / VERCEL_ORG_ID under GitHub repo Settings > Secrets and variables > Actions, re-enter the wrong one carefully, then Re-run failed jobs."
+              rm -f "$TMP_RESP"
+              exit 1
+              ;;
+          esac
+          # Preflight 3: confirm the project belongs to org VERCEL_ORG_ID (response accountId must match;
+          # mismatch = org secret is wrong, likely swapped with project). Values never printed.
+          if ! ACCOUNT_ID="$(grep -o '"accountId":"[^"]*"' "$TMP_RESP" | head -n1 | cut -d'"' -f4)"; then
+            echo "Vercel API preflight: could not read project org from API response - check VERCEL_TOKEN / VERCEL_PROJECT_ID under GitHub repo Settings > Secrets and variables > Actions, then Re-run failed jobs."
+            rm -f "$TMP_RESP"
+            exit 1
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "Vercel API preflight: could not read project org from API response - check VERCEL_TOKEN / VERCEL_PROJECT_ID under GitHub repo Settings > Secrets and variables > Actions, then Re-run failed jobs."
+            rm -f "$TMP_RESP"
+            exit 1
+          fi
+          if [ "$ACCOUNT_ID" != "$VERCEL_ORG_ID" ]; then
+            echo "Vercel API preflight: project belongs to a different org than VERCEL_ORG_ID - VERCEL_ORG_ID is wrong (likely swapped with VERCEL_PROJECT_ID) - fix under GitHub repo Settings > Secrets and variables > Actions: re-enter VERCEL_ORG_ID carefully (must start with team_...), then Re-run failed jobs."
+            rm -f "$TMP_RESP"
+            exit 1
+          fi
+          echo "Vercel API preflight: org match confirmed."
+          rm -f "$TMP_RESP"
+          # All checks passed - actual deploy (previously failed with 'Could not retrieve Project Settings' when IDs/token did not resolve).
+          # FIX kept: no --scope (with VERCEL_ORG_ID/VERCEL_PROJECT_ID env set the CLI already knows org+project); --yes kept (no interactive hang).
           vercel --token="$VERCEL_TOKEN" --prod --yes
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
