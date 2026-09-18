@@ -40,6 +40,16 @@ async function sendEmail(to: string, subject: string, html: string) {
       subject,
       html,
     });
+    // Resend SDK v4 does NOT throw on API errors (bad key, unverified
+    // domain, test-mode restriction) — it resolves { data: null, error }.
+    // Surface it so the Inngest step retries and the run goes red instead
+    // of silently logging a "sent" reminder for an email that never left.
+    const resendError = (result as { error?: { message?: string } | null })?.error;
+    if (resendError) {
+      console.error("[email] Resend rejected send to", to, "subject:", subject, "error:", resendError.message ?? resendError);
+      throw new Error(`Resend rejected email: ${resendError.message ?? "unknown error"}`);
+    }
+    console.log("[email] sent to", to, "subject:", subject, "id:", (result as { data?: { id?: string } | null })?.data?.id ?? "unknown");
     return result;
   } catch (error) {
     console.error("Failed to send email:", error);
@@ -577,6 +587,15 @@ export const promoteWaitlist = inngest.createFunction(
         to: entry.patientEmail,
         subject: `Slot Available: ${entry.service.name} with ${entry.provider.name}`,
         html,
+      }).then((result) => {
+        // Same Resend-v4 error-object trap as sendEmail above — surface it.
+        const resendError = (result as { error?: { message?: string } | null })?.error;
+        if (resendError) {
+          console.error("[email] Resend rejected waitlist promotion to", entry.patientEmail, "error:", resendError.message ?? resendError);
+          throw new Error(`Resend rejected email: ${resendError.message ?? "unknown error"}`);
+        }
+        console.log("[email] waitlist promotion sent to", entry.patientEmail, "id:", (result as { data?: { id?: string } | null })?.data?.id ?? "unknown");
+        return result;
       });
     });
 
