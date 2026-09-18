@@ -156,7 +156,35 @@ jobs:
         run: npm ci
 
       - name: Migrate production database (Neon)
-        run: npx prisma migrate deploy
+        run: |
+          # ONE-TIME BASELINE (P3005 self-heal): the production Neon branch was
+          # created with tables already present (db:push-style state) but no
+          # _prisma_migrations history. prisma/schema.prisma has not changed since
+          # Phase 0 and the single migration 20260831_init matches those tables,
+          # so marking it applied is safe HERE AND ONLY HERE.
+          # This does NOT mask real migration errors: only the literal P3005
+          # "database schema is not empty" triggers resolve+retry; any other
+          # failure (or a failed retry) exits non-zero and fails the step loudly.
+          set +e
+          OUTPUT=$(npx prisma migrate deploy 2>&1)
+          STATUS=$?
+          echo "$OUTPUT"
+          if [ $STATUS -eq 0 ]; then
+            exit 0
+          fi
+          if echo "$OUTPUT" | grep -q "P3005"; then
+            echo "P3005 detected (pre-existing schema, no migration history) - baselining 20260831_init once, then retrying..."
+            npx prisma migrate resolve --applied "20260831_init"
+            RESOLVE_STATUS=$?
+            if [ $RESOLVE_STATUS -ne 0 ]; then
+              echo "Baseline resolve failed - failing loudly."
+              exit $RESOLVE_STATUS
+            fi
+            npx prisma migrate deploy
+            exit $?
+          fi
+          echo "Migration failed with a non-P3005 error - failing loudly (no baseline attempted)."
+          exit $STATUS
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
