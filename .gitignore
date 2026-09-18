@@ -13,7 +13,8 @@
 # testing
 /coverage
 
-# next.js
+# next.js (anchored + recursive: never commit build caches, even nested ones)
+**/.next/
 /.next/
 /out/
 
