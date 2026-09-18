@@ -1,0 +1,46 @@
+# Seed production admin — MANUAL fallback (workflow_dispatch ONLY, never runs on push/PR).
+#
+# WHEN: owner's local network can't reach Neon (VPN-flaky P1001s), so Phase 7
+#   Step 6 `npm run db:seed:admin` can't run locally. Run this from GitHub
+#   instead — Actions runners reach Neon fine.
+#
+# REQUIRED GitHub Secrets (EXACT names — repo Settings > Secrets and variables > Actions):
+#   - DATABASE_URL    : production Neon pooled connection string (sslmode=verify-full)
+#   - ADMIN_EMAIL     : admin login email (e.g. owner@yourclinic.co.uk)
+#   - ADMIN_PASSWORD  : admin password, min 12 chars (never printed; masked in logs)
+#
+# HOW: Actions tab > "Seed production admin (manual)" > Run workflow > branch main > Run.
+# EXPECT: step log ends with "Admin ready: <email>". Then login at https://YOUR-ADDRESS/login.
+# Safe to re-run (upsert by email). No app code, no migrations, no time-code touched.
+
+name: Seed production admin (manual)
+
+on:
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20.x"
+
+jobs:
+  seed-admin:
+    name: Seed production admin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed admin (upsert from secrets)
+        run: npm run db:seed:admin
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}

@@ -165,26 +165,34 @@ jobs:
           # This does NOT mask real migration errors: only the literal P3005
           # "database schema is not empty" triggers resolve+retry; any other
           # failure (or a failed retry) exits non-zero and fails the step loudly.
-          set +e
-          OUTPUT=$(npx prisma migrate deploy 2>&1)
-          STATUS=$?
-          echo "$OUTPUT"
-          if [ $STATUS -eq 0 ]; then
-            exit 0
-          fi
-          if echo "$OUTPUT" | grep -q "P3005"; then
-            echo "P3005 detected (pre-existing schema, no migration history) - baselining 20260831_init once, then retrying..."
-            npx prisma migrate resolve --applied "20260831_init"
-            RESOLVE_STATUS=$?
-            if [ $RESOLVE_STATUS -ne 0 ]; then
-              echo "Baseline resolve failed - failing loudly."
-              exit $RESOLVE_STATUS
+          # RELIABILITY NOTE: GitHub runs each step with `bash -e -o pipefail`.
+          # A bare `OUTPUT=$(npx ...)` is NOT exempt from `set -e` on all bash
+          # versions — a failing npx inside $() can kill the whole step BEFORE
+          # our handling runs (suspect for run #8: red with no "P3005 detected"
+          # line). Commands in an `if` condition ARE exempt by POSIX guarantee,
+          # so every fallible command below sits in an `if` test. No `set +e`
+          # reliance, no bare STATUS=$? after $(). P3005-only gate unchanged.
+          if OUTPUT=$(npx prisma migrate deploy 2>&1); then
+            echo "$OUTPUT"
+            echo "Migrations applied cleanly."
+          else
+            echo "$OUTPUT"
+            if echo "$OUTPUT" | grep -q "P3005"; then
+              echo "P3005 detected (pre-existing schema, no migration history) - baselining 20260831_init once, then retrying..."
+              if RESOLVE_OUT=$(npx prisma migrate resolve --applied "20260831_init" 2>&1); then
+                echo "$RESOLVE_OUT"
+                echo "Baseline recorded. Retrying migrate deploy..."
+                npx prisma migrate deploy
+              else
+                echo "$RESOLVE_OUT"
+                echo "Baseline resolve failed - failing loudly (check DATABASE_URL points at the PRODUCTION branch, pooled string, branch awake)."
+                exit 1
+              fi
+            else
+              echo "Migration failed with a non-P3005 error - failing loudly (no baseline attempted)."
+              exit 1
             fi
-            npx prisma migrate deploy
-            exit $?
           fi
-          echo "Migration failed with a non-P3005 error - failing loudly (no baseline attempted)."
-          exit $STATUS
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -192,8 +200,21 @@ jobs:
         run: npm install -g vercel@latest
 
       - name: Deploy to Vercel Production
-        run: vercel --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }} --prod
+        run: |
+          # Preflight: fail fast naming WHICH secret is missing (values never printed),
+          # so "vercel-CLI auth" is distinguishable from "migrate P3005" in seconds.
+          # All tests sit in `if`/`||` positions: safe under `bash -e -o pipefail`.
+          missing=""
+          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "Missing Vercel secrets:$missing - add them under GitHub repo Settings > Secrets and variables > Actions, then Re-run failed jobs."
+            exit 1
+          fi
+          vercel --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --prod --yes
         env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           # NOTE: no Neon "promote" step — production is a dedicated `production`
