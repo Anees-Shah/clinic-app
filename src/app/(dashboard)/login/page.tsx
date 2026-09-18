@@ -28,12 +28,17 @@ function LoginFormContent() {
         redirect: false,
       });
 
-      if (result?.error) {
-        setError("Invalid email or password");
-      } else {
+      if (result?.ok && !result.error) {
         // Hard navigate so the fresh JWT cookie is sent on the next
         // request and middleware sees the logged-in state immediately.
         window.location.href = callbackUrl;
+      } else if (result?.error) {
+        setError("Invalid email or password");
+      } else {
+        // Transport failure (providers/csrf/network returned undefined or
+        // !ok with no error code). Surface it instead of navigating and
+        // mimicking a silent login loop.
+        setError("Something went wrong. Please try again.");
       }
     } catch {
       setError("Something went wrong. Please try again.");
