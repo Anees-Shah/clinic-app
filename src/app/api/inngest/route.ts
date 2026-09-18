@@ -9,6 +9,7 @@ import {
   scheduleReminders,
   syncCalendarEvent,
   cleanupExpiredTokens,
+  promoteWaitlist,
 } from "@/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -22,5 +23,6 @@ export const { GET, POST, PUT } = serve({
     scheduleReminders,
     syncCalendarEvent,
     cleanupExpiredTokens,
+    promoteWaitlist,
   ],
 });
