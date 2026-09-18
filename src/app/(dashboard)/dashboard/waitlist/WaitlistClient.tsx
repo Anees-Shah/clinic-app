@@ -57,7 +57,9 @@ export function WaitlistClient({ providers, services }: WaitlistClientProps) {
     }
   };
 
+  // Refetch from the server whenever filters change (async boundary, no cascade).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     fetchEntries();
   }, [filterProvider, filterDate]);
 

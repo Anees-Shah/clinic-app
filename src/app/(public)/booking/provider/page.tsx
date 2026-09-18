@@ -68,7 +68,7 @@ export default async function BookingProviderPage({ searchParams }: Props) {
             Choose Your Practitioner
           </h1>
           <p className="text-lg text-slate-600">
-            {service.name} — select the practitioner you'd prefer
+            {service.name} — select the practitioner you&apos;d prefer
           </p>
         </header>
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, isBefore } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, isBefore } from "date-fns";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 
 interface CalendarData {
   serviceCode: string;
@@ -19,12 +20,13 @@ interface CalendarClientProps {
 }
 
 export function BookingCalendarClient({ initialData }: CalendarClientProps) {
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(initialData.currentDate);
-  const [days, setDays] = useState(initialData.days);
   const [today] = useState(initialData.today);
   const { serviceCode, providerId, serviceName, providerName } = initialData;
 
-  useEffect(() => {
+  // Derived during render (not state+effect): same values, no cascading render.
+  const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -36,18 +38,18 @@ export function BookingCalendarClient({ initialData }: CalendarClientProps) {
       newDays.push(day);
       day = addDays(day, 1);
     }
-    setDays(newDays);
+    return newDays;
   }, [currentDate]);
 
   const goToMonth = (monthOffset: number) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + monthOffset);
     setCurrentDate(newDate);
-    window.location.href = `/booking/calendar?service=${serviceCode}&provider=${providerId}&date=${format(newDate, "yyyy-MM-dd")}`;
+    router.push(`/booking/calendar?service=${serviceCode}&provider=${providerId}&date=${format(newDate, "yyyy-MM-dd")}`);
   };
 
   const goToSlot = (date: Date) => {
-    window.location.href = `/booking/slot?service=${serviceCode}&provider=${providerId}&date=${format(date, "yyyy-MM-dd")}`;
+    router.push(`/booking/slot?service=${serviceCode}&provider=${providerId}&date=${format(date, "yyyy-MM-dd")}`);
   };
 
   return (

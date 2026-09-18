@@ -25,7 +25,7 @@ export async function isBusinessDay(date: Date): Promise<boolean> {
  * Get the next business day after a given date
  */
 export async function getNextBusinessDay(date: Date): Promise<Date> {
-  let next = new Date(date);
+  const next = new Date(date);
   next.setDate(next.getDate() + 1);
   
   while (!(await isBusinessDay(next))) {

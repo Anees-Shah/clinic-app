@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProviderWithServices } from "@/lib/providers";
@@ -43,10 +43,10 @@ function initialsOf(name: string): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-/** Circle avatar with live preview; falls back to initials on empty/broken URL. */
+/** Circle avatar with live preview; falls back to initials on empty/broken URL.
+ *  Remounted via key={url} by callers, so no reset effect is needed. */
 function StaffAvatar({ url, name, size }: { url: string | null; name: string; size: number }) {
   const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [url]);
   const clean = (url || "").trim();
   return (
     <div
@@ -225,7 +225,7 @@ export function ProvidersClient({ providers: initialProviders, services }: Provi
               <div>
                 <label htmlFor="staff-photo" className="label">Photo URL (optional)</label>
                 <div className="flex items-center gap-3">
-                  <StaffAvatar url={formData.photoUrl} name={formData.name || "New staff"} size={56} />
+                  <StaffAvatar key={formData.photoUrl} url={formData.photoUrl} name={formData.name || "New staff"} size={56} />
                   <input
                     id="staff-photo"
                     value={formData.photoUrl}
@@ -337,7 +337,7 @@ export function ProvidersClient({ providers: initialProviders, services }: Provi
                 <tr key={p.id} className="border-b border-slate-800/50 hover:bg-slate-950/50">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <StaffAvatar url={p.photoUrl} name={p.name} size={40} />
+                      <StaffAvatar key={`${p.id}-${p.photoUrl ?? ""}`} url={p.photoUrl} name={p.name} size={40} />
                       <div>
                         <p className="font-medium">{p.name}</p>
                         <p className="text-xs text-slate-500">{p.title}</p>

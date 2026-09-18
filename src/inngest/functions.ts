@@ -129,7 +129,7 @@ export const sendConfirmation = inngest.createFunction(
     }
 
     await step.run("send-confirmation-email", async () => {
-      const html = buildAppointmentHtml(appointment as any, `
+      const html = buildAppointmentHtml(appointment as AppointmentData, `
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #1e293b;">Your Appointment is Confirmed! ✨</h2>
         <p style="margin: 0 0 24px 0; color: #475569;">Hi ${appointment.patientName},</p>
         <p style="margin: 0 0 16px 0; color: #475569;">Your appointment has been successfully booked. We look forward to seeing you!</p>
@@ -170,7 +170,7 @@ export const sendCancellation = inngest.createFunction(
     }
 
     await step.run("send-cancellation-email", async () => {
-      const html = buildAppointmentHtml(appointment as any, `
+      const html = buildAppointmentHtml(appointment as AppointmentData, `
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #dc2626;">Appointment Cancelled</h2>
         <p style="margin: 0 0 24px 0; color: #475569;">Hi ${appointment.patientName},</p>
         <p style="margin: 0 0 16px 0; color: #475569;">Your appointment has been cancelled. The slot is now available for other patients.</p>
@@ -212,7 +212,7 @@ export const sendReschedule = inngest.createFunction(
     }
 
     await step.run("send-reschedule-email", async () => {
-      const html = buildAppointmentHtml(appointment as any, `
+      const html = buildAppointmentHtml(appointment as AppointmentData, `
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #0369a1;">Appointment Rescheduled</h2>
         <p style="margin: 0 0 24px 0; color: #475569;">Hi ${appointment.patientName},</p>
         <p style="margin: 0 0 16px 0; color: #475569;">Your appointment has been rescheduled to the new time shown above.</p>
@@ -266,7 +266,7 @@ export const sendReminder24h = inngest.createFunction(
     }
 
     await step.run("send-reminder-email", async () => {
-      const html = buildAppointmentHtml(appointment as any, `
+      const html = buildAppointmentHtml(appointment as AppointmentData, `
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #1e293b;">Reminder: Your Appointment is Tomorrow</h2>
         <p style="margin: 0 0 24px 0; color: #475569;">Hi ${appointment.patientName},</p>
         <p style="margin: 0 0 16px 0; color: #475569;">This is a friendly reminder that your appointment is tomorrow.</p>
@@ -320,7 +320,7 @@ export const sendReminder1h = inngest.createFunction(
     }
 
     await step.run("send-reminder-email", async () => {
-      const html = buildAppointmentHtml(appointment as any, `
+      const html = buildAppointmentHtml(appointment as AppointmentData, `
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #1e293b;">Reminder: Your Appointment is in 1 Hour</h2>
         <p style="margin: 0 0 24px 0; color: #475569;">Hi ${appointment.patientName},</p>
         <p style="margin: 0 0 16px 0; color: #475569;">Your appointment starts in <strong>1 hour</strong>.</p>

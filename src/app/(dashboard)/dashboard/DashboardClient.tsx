@@ -72,7 +72,11 @@ export function DashboardClient({ providers }: DashboardClientProps) {
     }
   }, [view, currentDate, selectedProviderId]);
 
+  // Refetch from the server whenever view/date/filter changes. Server-data
+  // fetching on param change is the canonical useEffect use case (async
+  // boundary, no cascading render).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     fetchAppointments();
   }, [fetchAppointments]);
 

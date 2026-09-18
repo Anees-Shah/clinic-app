@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect, Suspense } from "react";
+import { useState, FormEvent, Suspense } from "react";
 import { fmtLondonDay, addWallMinutes } from "@/lib/london";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,19 @@ interface SlotData {
   date: string;
   slot: string;
 }
+
+// Static lookup tables (module scope — no state/effect needed to read them).
+const SERVICE_INFO: Record<string, { name: string; price: string }> = {
+  botox: { name: "Anti-Wrinkle Injections (Botox)", price: "£250.00" },
+  filler: { name: "Dermal Fillers", price: "£350.00" },
+  consultation: { name: "Aesthetic Consultation", price: "£50.00" },
+  profhilo: { name: "Profhilo (Skin Remodelling)", price: "£300.00" },
+};
+
+const PROVIDER_NAMES: Record<string, string> = {
+  "provider-dr-smith": "Dr. Sarah Smith",
+  "provider-dr-jones": "Dr. James Jones",
+};
 
 function BookingFormContent() {
   const router = useRouter();
@@ -34,32 +47,12 @@ function BookingFormContent() {
     slot: searchParams.get("slot") || "",
   };
 
-  const [serviceName, setServiceName] = useState("");
-  const [providerName, setProviderName] = useState("");
-  const [price, setPrice] = useState("");
-
-  useEffect(() => {
-    if (slotData.service) {
-      const services: Record<string, { name: string; price: string }> = {
-        botox: { name: "Anti-Wrinkle Injections (Botox)", price: "£250.00" },
-        filler: { name: "Dermal Fillers", price: "£350.00" },
-        consultation: { name: "Aesthetic Consultation", price: "£50.00" },
-        profhilo: { name: "Profhilo (Skin Remodelling)", price: "£300.00" },
-      };
-      const s = services[slotData.service];
-      if (s) {
-        setServiceName(s.name);
-        setPrice(s.price);
-      }
-    }
-    if (slotData.provider) {
-      const providers: Record<string, string> = {
-        "provider-dr-smith": "Dr. Sarah Smith",
-        "provider-dr-jones": "Dr. James Jones",
-      };
-      setProviderName(providers[slotData.provider] || "");
-    }
-  }, [slotData]);
+  // Derived during render from the static tables above (pure lookup — the
+  // previous state+effect version caused cascading renders).
+  const _svc = SERVICE_INFO[slotData.service];
+  const serviceName = _svc?.name ?? "";
+  const price = _svc?.price ?? "";
+  const providerName = PROVIDER_NAMES[slotData.provider] ?? "";
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
@@ -355,7 +348,7 @@ function BookingFormContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-slate-500">
-                No payment required today. You'll pay at the clinic. By confirming, you agree to our
+                No payment required today. You&apos;ll pay at the clinic. By confirming, you agree to our
                 <a href="#" className="underline hover:text-slate-700">cancellation policy</a>
                 (free cancellation up to 48 business hours before).
               </p>

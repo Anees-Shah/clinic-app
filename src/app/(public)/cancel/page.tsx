@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getAppointmentByToken } from "@/actions/appointments";
 import CancelForm from "./CancelForm";
 
@@ -51,13 +52,13 @@ export default async function CancelPage({ searchParams }: Props) {
                 Unable to Cancel
               </h2>
               <p className="text-slate-600 mb-6">{error}</p>
-              <a href="/" className="btn btn-primary">
+              <Link href="/" className="btn btn-primary">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <line x1="19" y1="12" x2="5" y2="12" />
                   <polyline points="12 19 5 12 12 5" />
                 </svg>
                 Back to Home
-              </a>
+              </Link>
             </div>
           ) : appointment ? (
             <CancelForm
@@ -87,7 +88,7 @@ export default async function CancelPage({ searchParams }: Props) {
               <p className="text-slate-600 mb-6">
                 This cancellation link is invalid or has already been used.
               </p>
-              <a href="/" className="btn btn-primary">Back to Home</a>
+              <Link href="/" className="btn btn-primary">Back to Home</Link>
             </div>
           )}
         </div>

@@ -11,7 +11,10 @@ interface ClientOnlyProps {
 export function ClientOnly({ children, fallback = null }: ClientOnlyProps) {
   const [mounted, setMounted] = useState(false);
 
+  // Mount detection is the one legitimate setState-in-effect: it only exists
+  // to suppress hydration mismatches and never cascades (empty deps).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setMounted(true);
   }, []);
 

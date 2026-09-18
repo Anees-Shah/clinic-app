@@ -40,7 +40,7 @@ export default async function BookingServicePage() {
             Choose Your Treatment
           </h1>
           <p className="text-lg text-slate-600">
-            Select the treatment you'd like to book. All treatments are performed by qualified medical professionals.
+            Select the treatment you&apos;d like to book. All treatments are performed by qualified medical professionals.
           </p>
         </header>
 
