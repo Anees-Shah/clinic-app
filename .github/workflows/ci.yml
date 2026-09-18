@@ -201,18 +201,19 @@ jobs:
 
       - name: Deploy to Vercel Production
         run: |
-          # Preflight: fail fast naming WHICH secret is missing (values never printed),
-          # so "vercel-CLI auth" is distinguishable from "migrate P3005" in seconds.
-          # All tests sit in `if`/`||` positions: safe under `bash -e -o pipefail`.
-          missing=""
-          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
-          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
-          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
-          if [ -n "$missing" ]; then
-            echo "Missing Vercel secrets:$missing - add them under GitHub repo Settings > Secrets and variables > Actions, then Re-run failed jobs."
+          # Preflight: fail fast naming WHICH secret is malformed/missing (shapes only, values never printed),
+          # so a swapped ORG<->PROJECT paste or typo is caught here instead of a cryptic CLI error.
+          # All tests sit in `||`/case positions: safe under `bash -e -o pipefail`.
+          bad=""
+          [ -n "$VERCEL_TOKEN" ] || bad="$bad VERCEL_TOKEN(missing/empty)"
+          case "${VERCEL_ORG_ID:-}" in team_*) ;; *) bad="$bad VERCEL_ORG_ID(must start with team_ - check swap/typo)";; esac
+          case "${VERCEL_PROJECT_ID:-}" in prj_*) ;; *) bad="$bad VERCEL_PROJECT_ID(must start with prj_ - check swap/typo)";; esac
+          if [ -n "$bad" ]; then
+            echo "Vercel secret shape check failed:$bad - fix under GitHub repo Settings > Secrets and variables > Actions (prefixes only: org=team_..., project=prj_...), then Re-run failed jobs."
             exit 1
           fi
-          vercel --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --prod --yes
+          # FIX: dropped --scope (was --scope="$VERCEL_ORG_ID"): with VERCEL_ORG_ID/VERCEL_PROJECT_ID env set the CLI already knows org+project (documented CI pattern), and --scope's ID-vs-slug strictness was the whole "scope does not exist" bug.
+          vercel --token="$VERCEL_TOKEN" --prod --yes
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
